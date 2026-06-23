@@ -1,0 +1,27 @@
+# ============================================================
+# Automated Reporting Platform — Dependencies
+# ============================================================
+
+# API framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# Data processing
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# Document extraction
+pdfplumber>=0.10.0
+python-docx>=1.1.0
+
+# PDF generation
+reportlab>=4.1.0
+
+# Background scheduling
+APScheduler>=3.10.0
+
+# Settings and environment management
+pydantic-settings>=2.0.0
+pydantic[email]>=2.0.0
+python-dotenv>=1.0.0
