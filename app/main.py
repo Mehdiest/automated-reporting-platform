@@ -19,6 +19,7 @@ from app.api.routes import router as document_router
 from app.api.data_routes import router as data_router
 from app.api.scheduler_routes import router as scheduler_router
 from app.api.email_routes import router as email_router
+from app.api.multi_dataset_routes import router as multi_dataset_router
 from app.services.scheduler import start_scheduler, shutdown_scheduler
 
 
@@ -41,6 +42,7 @@ app.include_router(document_router, prefix="/docs", tags=["Documents"])
 app.include_router(data_router, prefix="/data", tags=["Data"])
 app.include_router(scheduler_router)
 app.include_router(email_router)
+app.include_router(multi_dataset_router)
 
 
 @app.get("/health", tags=["System"])
