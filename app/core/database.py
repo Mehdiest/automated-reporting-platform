@@ -40,5 +40,7 @@ def init_db() -> None:
     Create all database tables defined in ORM models.
     Called once at application startup.
     """
-    from app.models.user import User  # noqa: F401 — registers model with Base
+    # Import every model so it registers with Base before create_all.
+    from app.models.user import User                              # noqa: F401
+    from app.models.organization import Organization, UsageRecord  # noqa: F401
     Base.metadata.create_all(bind=engine)

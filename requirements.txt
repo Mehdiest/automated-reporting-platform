@@ -38,3 +38,6 @@ passlib[bcrypt]>=1.7.4
 # Pin bcrypt: passlib 1.7.4 is incompatible with bcrypt >= 4.1
 # (registration fails with "password cannot be longer than 72 bytes").
 bcrypt<4.1
+
+# AI insights (optional — falls back to a rule-based generator if no API key)
+openai>=1.0.0
