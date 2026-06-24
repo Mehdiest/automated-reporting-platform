@@ -1,10 +1,41 @@
+# ----- Python -----
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# ----- Virtual environments -----
 .venv/
 env/
 venv/
+ENV/
+
+# ----- IDE / Editor -----
 .idea/
 .vscode/
+*.swp
+
+# ----- OS -----
 .DS_Store
+Thumbs.db
+
+# ----- Secrets / Environment -----
 .env
 *.env
+!.env.example
+
+# ----- Database (SQLite) -----
+*.db
+*.sqlite
+*.sqlite3
+reporting_platform.db
+
+# ----- Generated reports -----
+reports/*.pdf
+reports/*.PDF
+
+# ----- Logs -----
+*.log
+
+# ----- Local test artifacts -----
+auth_test.py
+.pytest_cache/

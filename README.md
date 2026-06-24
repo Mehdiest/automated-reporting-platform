@@ -1,8 +1,8 @@
 # Automated Reporting Platform
 
-A production-ready FastAPI backend that automates the full reporting pipeline — from raw data ingestion to KPI extraction, PDF generation, scheduled delivery, email distribution, and multi-dataset consolidation.
+A production-ready FastAPI backend that automates the full reporting pipeline — from raw data ingestion to KPI extraction, PDF generation, scheduled delivery, email distribution, multi-dataset consolidation, multi-user authentication, and a live reporting dashboard.
 
-Built as a portfolio project demonstrating clean architecture, background job management, and professional API design.
+Built as a portfolio project demonstrating clean architecture, background job management, secure JWT authentication, and professional API design.
 
 ---
 
@@ -21,6 +21,13 @@ Built as a portfolio project demonstrating clean architecture, background job ma
 - Upload multiple datasets simultaneously and generate a single consolidated report
 - Per-dataset KPI breakdown plus merged aggregate summary
 
+### Phase 3 — Multi-User System & Dashboard
+- **User accounts** backed by SQLite + SQLAlchemy (`users` table auto-created on startup)
+- **Secure registration** with bcrypt password hashing — plaintext passwords are never stored
+- **JWT authentication** — login issues a signed Bearer token (HS256) with configurable expiry
+- **Protected endpoints** via a reusable `get_current_user` dependency (`/auth/me`)
+- **Reporting dashboard** — an HTML page plus JSON endpoints that aggregate KPI stats and catalogue every generated report on disk
+
 ---
 
 ## Tech Stack
@@ -32,6 +39,8 @@ Built as a portfolio project demonstrating clean architecture, background job ma
 | PDF Generation | ReportLab |
 | Scheduling | APScheduler |
 | Email Delivery | SMTP (Mailtrap) |
+| Database / ORM | SQLite + SQLAlchemy |
+| Authentication | JWT (python-jose) + bcrypt (passlib) |
 | Settings | Pydantic Settings + python-dotenv |
 
 ---
@@ -41,26 +50,34 @@ Built as a portfolio project demonstrating clean architecture, background job ma
 ```
 automated-reporting-platform/
 ├── app/
-│   ├── main.py                       # App entry point, router registration
+│   ├── main.py                       # App entry point, router registration, lifespan
 │   ├── api/
 │   │   ├── routes.py                 # Document upload endpoints
-│   │   ├── data_routes.py            # CSV/Excel upload and report generation
+│   │   ├── data_routes.py            # CSV/Excel upload and KPI extraction
 │   │   ├── scheduler_routes.py       # Scheduled job management
 │   │   ├── email_routes.py           # Manual email delivery
-│   │   └── multi_dataset_routes.py   # Multi-file upload and combined report
+│   │   ├── multi_dataset_routes.py   # Multi-file upload and combined report
+│   │   ├── auth_routes.py            # Register / login / me
+│   │   └── dashboard_routes.py       # Dashboard page + stats + report catalogue
 │   ├── core/
-│   │   └── config.py                 # Environment-based configuration
+│   │   ├── config.py                 # Environment-based configuration
+│   │   ├── database.py               # SQLite + SQLAlchemy engine, session, init_db
+│   │   └── dependencies.py           # JWT auth dependency (get_current_user)
 │   ├── models/
-│   │   └── schemas.py                # Pydantic request/response schemas
-│   └── services/
-│       ├── data_processor.py         # Data cleaning and transformation
-│       ├── file_extractor.py         # Text extraction from PDF/DOCX
-│       ├── kpi_engine.py             # KPI calculation logic
-│       ├── report_generator.py       # Single-dataset PDF report builder
-│       ├── multi_dataset_processor.py# Multi-file ingestion and KPI merging
-│       ├── multi_report_generator.py # Multi-section PDF report builder
-│       ├── scheduler.py              # APScheduler job management
-│       └── email_service.py          # SMTP email delivery
+│   │   ├── schemas.py                # Pydantic request/response schemas
+│   │   └── user.py                   # SQLAlchemy User ORM model
+│   ├── services/
+│   │   ├── data_processor.py         # Data cleaning and transformation
+│   │   ├── file_extractor.py         # Text extraction from PDF/DOCX
+│   │   ├── kpi_engine.py             # KPI calculation logic
+│   │   ├── report_generator.py       # Single-dataset PDF report builder
+│   │   ├── multi_dataset_processor.py# Multi-file ingestion and KPI merging
+│   │   ├── multi_report_generator.py # Multi-section PDF report builder
+│   │   ├── scheduler.py              # APScheduler job management
+│   │   ├── email_service.py          # SMTP email delivery
+│   │   └── auth_service.py           # Password hashing + JWT generation/validation
+│   └── static/
+│       └── dashboard.html            # Reporting dashboard frontend
 ├── data/                             # Input datasets
 ├── reports/                          # Generated PDF reports
 ├── test/                             # Test scripts
@@ -86,6 +103,8 @@ cd automated-reporting-platform
 pip install -r requirements.txt
 ```
 
+> **Note:** `bcrypt` is pinned to `<4.1` because `passlib 1.7.4` is incompatible with newer bcrypt releases (registration would fail with a 500 error). Keep this pin in place.
+
 ### 3. Configure environment variables
 
 Copy `.env.example` to `.env` and fill in your credentials:
@@ -95,8 +114,13 @@ cp .env.example .env
 ```
 
 ```env
+# Email delivery via Mailtrap SMTP
 EMAIL_SENDER=hello@demomailtrap.co
 EMAIL_PASSWORD=your_mailtrap_api_token
+
+# JWT Authentication
+JWT_SECRET_KEY=change-this-to-a-long-random-secret
+JWT_EXPIRE_MINUTES=60
 ```
 
 ### 4. Run the server
@@ -104,6 +128,8 @@ EMAIL_PASSWORD=your_mailtrap_api_token
 ```bash
 uvicorn app.main:app --reload
 ```
+
+On startup the app loads `.env`, creates the SQLite database (`reporting_platform.db`) and the `users` table, and starts the background scheduler.
 
 ### 5. Open the API docs
 
@@ -115,11 +141,18 @@ http://127.0.0.1:8000/docs
 
 ## API Overview
 
+### Authentication
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/auth/register` | Create a new user account |
+| POST | `/auth/login` | Authenticate and receive a JWT Bearer token |
+| GET | `/auth/me` | Return the current authenticated user (requires Bearer token) |
+
 ### Data & Reports
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/data/upload-data` | Upload CSV/Excel and generate PDF report |
-| GET | `/data/download-report` | Download the generated PDF |
+| POST | `/data/upload-data` | Upload CSV/Excel and extract KPIs |
+| POST | `/docs/upload-document` | Upload a PDF/DOCX/TXT and extract text |
 
 ### Multi-Dataset
 | Method | Endpoint | Description |
@@ -139,6 +172,13 @@ http://127.0.0.1:8000/docs
 |---|---|---|
 | POST | `/email/send-report` | Send a PDF report via email |
 
+### Dashboard
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/dashboard/` | Serve the reporting dashboard HTML page |
+| GET | `/dashboard/stats` | Aggregated KPI / report statistics |
+| GET | `/dashboard/reports` | Catalogue of all generated PDF reports on disk |
+
 ### System
 | Method | Endpoint | Description |
 |---|---|---|
@@ -146,13 +186,31 @@ http://127.0.0.1:8000/docs
 
 ---
 
+## Example: Register, Log In, and Access a Protected Endpoint
+
+```bash
+# 1. Register
+curl -X POST "http://127.0.0.1:8000/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "mehdi", "email": "mehdi@example.com", "password": "securepassword"}'
+
+# 2. Log in → returns { "access_token": "...", "token_type": "bearer" }
+curl -X POST "http://127.0.0.1:8000/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "mehdi", "password": "securepassword"}'
+
+# 3. Call a protected endpoint with the token
+curl -X GET "http://127.0.0.1:8000/auth/me" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
 ## Example: Schedule a Job with Email Delivery
 
 ```json
 POST /scheduler/jobs
 {
   "job_id": "daily_sales",
-  "dataset_path": "data/sales.csv",
+  "dataset_path": "data/sample.csv",
   "interval_minutes": 60,
   "output_dir": "reports",
   "email_recipient": "client@example.com",
@@ -176,6 +234,8 @@ curl -X POST "http://127.0.0.1:8000/multi/upload-and-report" \
 |---|---|
 | `EMAIL_SENDER` | Sender email address (Mailtrap sandbox address) |
 | `EMAIL_PASSWORD` | Mailtrap API token |
+| `JWT_SECRET_KEY` | Secret used to sign JWT tokens (use a long random value in production) |
+| `JWT_EXPIRE_MINUTES` | Access-token lifetime in minutes (default: 60) |
 
 Never commit your `.env` file. Use `.env.example` as a reference template.
 
@@ -185,7 +245,7 @@ Never commit your `.env` file. Use `.env.example` as a reference template.
 
 - [x] Phase 1 — Core pipeline (upload, KPI, PDF, download)
 - [x] Phase 2 — Automation (scheduling, email, multi-dataset)
-- [ ] Phase 3 — Dashboard integration, multi-user system
+- [x] Phase 3 — Multi-user system (SQLite, JWT auth) & reporting dashboard
 - [ ] Phase 4 — AI insights, SaaS structure
 
 ---

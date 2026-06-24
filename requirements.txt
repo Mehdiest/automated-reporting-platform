@@ -28,3 +28,13 @@ python-dotenv>=1.0.0
 
 # Email validation
 email-validator>=2.0.0
+
+# Database
+sqlalchemy>=2.0.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+# Pin bcrypt: passlib 1.7.4 is incompatible with bcrypt >= 4.1
+# (registration fails with "password cannot be longer than 72 bytes").
+bcrypt<4.1
